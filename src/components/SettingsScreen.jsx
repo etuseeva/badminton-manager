@@ -61,46 +61,46 @@ export default function SettingsScreen({ config, setConfig, onClose }) {
           </SettingCard>
 
           <SettingCard
-            label="Повторы"
-            description="Как часто одни и те же игроки могут оказаться вместе"
+            label="Избегать повторов"
+            description="Не ставить одних и тех же игроков вместе повторно"
           >
-            <SegmentedControl
-              options={[
-                { value: 'often', label: 'Часто' },
-                { value: 'sometimes', label: 'Иногда' },
-                { value: 'rarely', label: 'Редко' },
-              ]}
-              value={config.repeatFrequency}
-              onChange={(v) => update('repeatFrequency', v)}
-            />
-          </SettingCard>
-
-          <SettingCard
-            label="Случайность"
-            description="Насколько случайным будет подбор пар"
-          >
-            <SegmentedControl
-              options={[
-                { value: 'min', label: 'Минимум' },
-                { value: 'medium', label: 'Средне' },
-                { value: 'max', label: 'Максимум' },
-              ]}
-              value={config.randomness}
-              onChange={(v) => update('randomness', v)}
+            <Toggle
+              value={config.avoidRepeats}
+              onChange={(v) => update('avoidRepeats', v)}
             />
           </SettingCard>
 
           {isDoubles && (
             <SettingCard
               label="Смешанные пары"
-              description="Стараться ставить М и Ж вместе"
+              description="Ставить М и Ж вместе в одну пару"
             >
-              <Toggle
+              <SegmentedControl
+                options={[
+                  { value: 'any', label: 'Не важно' },
+                  { value: 'prefer', label: 'Стараться' },
+                  { value: 'only', label: 'Только' },
+                ]}
                 value={config.mixedPairs}
                 onChange={(v) => update('mixedPairs', v)}
               />
             </SettingCard>
           )}
+
+          <SettingCard
+            label="Перемешивание"
+            description="Как менять пары при перегенерации"
+          >
+            <SegmentedControl
+              options={[
+                { value: 'swap', label: 'Свапы' },
+                { value: 'rebuild', label: 'Пересборка' },
+                { value: 'rotate', label: 'Ротация' },
+              ]}
+              value={config.reshuffleMode}
+              onChange={(v) => update('reshuffleMode', v)}
+            />
+          </SettingCard>
         </div>
       </div>
     </div>

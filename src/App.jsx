@@ -12,9 +12,9 @@ const DEFAULT_CONFIG = {
   gameFormat: 'doubles',
   pairLevelTolerance: 2,
   courtLevelTolerance: 3,
-  repeatFrequency: 'sometimes',
-  randomness: 'medium',
-  mixedPairs: false,
+  avoidRepeats: true,
+  mixedPairs: 'any',
+  reshuffleMode: 'rebuild',
 };
 
 export default function App() {
@@ -45,6 +45,7 @@ export default function App() {
             session={session}
             setSession={setSession}
             config={config}
+            setConfig={setConfig}
             history={history}
             setHistory={setHistory}
           />

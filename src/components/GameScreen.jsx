@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { generateCourts } from '../utils/pairing';
 import CourtCard from './PairCard';
 import SearchInput from './SearchInput';
+import SettingsScreen from './SettingsScreen';
 
 const levelColors = [
   '',
@@ -17,14 +18,17 @@ export default function GameScreen({
   session,
   setSession,
   config,
+  setConfig,
   history,
   setHistory,
 }) {
   const [selected, setSelected] = useState(() => new Set(players.map((p) => p.id)));
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [search, setSearch] = useState('');
   const [sessionSearch, setSessionSearch] = useState('');
+  const [swapPlayerId, setSwapPlayerId] = useState(null);
 
   const toggle = (id) => {
     setSelected((prev) => {
@@ -71,13 +75,23 @@ export default function GameScreen({
     });
   };
 
+  const getCurrentCourts = () => {
+    if (!session || session.rounds.length === 0) return null;
+    const last = session.rounds[session.rounds.length - 1];
+    if (last.confirmed) return null;
+    return last.courts || null;
+  };
+
   const doGenerate = () => {
+    const currentCourts = getCurrentCourts();
     const result = generateCourts(
       session.activePlayerIds,
       players,
       config,
-      session.rounds
+      session.rounds,
+      currentCourts,
     );
+    setSwapPlayerId(null);
     setSession((prev) => {
       const rounds = [...prev.rounds];
       if (rounds.length > 0 && !rounds[rounds.length - 1].confirmed) {
@@ -95,8 +109,10 @@ export default function GameScreen({
       session.activePlayerIds,
       players,
       config,
-      confirmedRounds
+      confirmedRounds,
+      null,
     );
+    setSwapPlayerId(null);
     setSession((prev) => ({
       ...prev,
       rounds: [
@@ -113,6 +129,52 @@ export default function GameScreen({
       activePlayerIds: [...prev.activePlayerIds, id],
     }));
     setShowAddPlayer(false);
+  };
+
+  const handleSwapClick = (playerId) => {
+    if (!swapPlayerId) {
+      setSwapPlayerId(playerId);
+      return;
+    }
+    if (swapPlayerId === playerId) {
+      setSwapPlayerId(null);
+      return;
+    }
+
+    const currentRound = session.rounds[session.rounds.length - 1];
+    if (!currentRound || !currentRound.courts) return;
+
+    const findCourt = (id) => currentRound.courts.findIndex((c) =>
+      c.team1.includes(id) || c.team2.includes(id),
+    );
+
+    const courtIdx1 = findCourt(swapPlayerId);
+    const courtIdx2 = findCourt(playerId);
+
+    if (courtIdx1 === -1 || courtIdx2 === -1 || courtIdx1 === courtIdx2) {
+      setSwapPlayerId(playerId);
+      return;
+    }
+
+    setSession((prev) => {
+      const rounds = [...prev.rounds];
+      const round = { ...rounds[rounds.length - 1] };
+      const courts = round.courts.map((c) => ({ team1: [...c.team1], team2: [...c.team2] }));
+
+      const replaceInCourt = (court, oldId, newId) => ({
+        team1: court.team1.map((id) => (id === oldId ? newId : id)),
+        team2: court.team2.map((id) => (id === oldId ? newId : id)),
+      });
+
+      courts[courtIdx1] = replaceInCourt(courts[courtIdx1], swapPlayerId, playerId);
+      courts[courtIdx2] = replaceInCourt(courts[courtIdx2], playerId, swapPlayerId);
+
+      round.courts = courts;
+      rounds[rounds.length - 1] = round;
+      return { ...prev, rounds };
+    });
+
+    setSwapPlayerId(null);
   };
 
   const playerName = (id) => players.find((p) => p.id === id)?.name || '?';
@@ -220,12 +282,21 @@ export default function GameScreen({
         <h1 className="text-lg font-bold text-gray-800">
           Раунд {session.rounds.length || '—'}
         </h1>
-        <button
-          onClick={endSession}
-          className="text-xs text-red-400 underline"
-        >
-          Завершить игру
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-base text-gray-400"
+            title="Настройки"
+          >
+            ⚙️
+          </button>
+          <button
+            onClick={endSession}
+            className="text-xs text-red-400 underline"
+          >
+            Завершить игру
+          </button>
+        </div>
       </div>
 
       <div className="text-xs text-gray-400">
@@ -239,10 +310,25 @@ export default function GameScreen({
         </div>
       )}
 
+      {swapPlayerId && (
+        <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 flex items-center justify-between">
+          <span>Выберите игрока на другом корте для обмена</span>
+          <button onClick={() => setSwapPlayerId(null)} className="text-blue-400 ml-2">✕</button>
+        </div>
+      )}
+
       {currentRound && currentRound.courts && currentRound.courts.length > 0 ? (
         <div className="space-y-2">
           {currentRound.courts.map((court, i) => (
-            <CourtCard key={i} court={court} players={players} index={i} />
+            <CourtCard
+              key={i}
+              court={court}
+              players={players}
+              index={i}
+              swapPlayerId={swapPlayerId}
+              onSwapClick={currentRound && !currentRound.confirmed ? handleSwapClick : undefined}
+              courtIndex={i}
+            />
           ))}
           {currentRound.sittingOut && currentRound.sittingOut.length > 0 && (
             <div className="text-center text-xs text-gray-400 py-2 bg-gray-50 rounded-lg">
@@ -365,6 +451,14 @@ export default function GameScreen({
             </div>
           )}
         </div>
+      )}
+
+      {showSettings && (
+        <SettingsScreen
+          config={config}
+          setConfig={setConfig}
+          onClose={() => setShowSettings(false)}
+        />
       )}
     </div>
   );

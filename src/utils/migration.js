@@ -1,12 +1,18 @@
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 export function runMigration() {
   const version = JSON.parse(localStorage.getItem('bp_version') || '0');
   if (version >= CURRENT_VERSION) return;
 
-  migratePlayersModel();
-  migrateBlacklistToPlayers();
-  migrateConfig();
+  if (version < 2) {
+    migratePlayersModel();
+    migrateBlacklistToPlayers();
+    migrateConfig();
+  }
+
+  if (version < 3) {
+    migrateConfigV3();
+  }
 
   localStorage.setItem('bp_version', JSON.stringify(CURRENT_VERSION));
 }
@@ -77,6 +83,25 @@ function migrateConfig() {
     repeatFrequency,
     randomness,
     mixedPairs: config.mixedPairs ?? false,
+  };
+
+  localStorage.setItem('bp_config', JSON.stringify(migrated));
+}
+
+function migrateConfigV3() {
+  const raw = localStorage.getItem('bp_config');
+  if (!raw) return;
+
+  const config = JSON.parse(raw);
+  if (config.avoidRepeats !== undefined) return;
+
+  const migrated = {
+    gameFormat: config.gameFormat || 'doubles',
+    pairLevelTolerance: config.pairLevelTolerance ?? 2,
+    courtLevelTolerance: config.courtLevelTolerance ?? 3,
+    avoidRepeats: config.repeatFrequency !== 'often',
+    mixedPairs: config.mixedPairs === true ? 'prefer' : (typeof config.mixedPairs === 'string' ? config.mixedPairs : 'any'),
+    reshuffleMode: 'rebuild',
   };
 
   localStorage.setItem('bp_config', JSON.stringify(migrated));
