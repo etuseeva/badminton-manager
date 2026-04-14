@@ -342,87 +342,7 @@ function buildCourts(pool, playerMap, config, blacklistSet, previousRounds) {
   return sortCourtsByStrength(courts, playerMap);
 }
 
-// ── SWAP: small random swaps between courts ──
-function swapCourts(currentCourts, playerMap, config, blacklistSet) {
-  const isDoubles = config.gameFormat !== 'singles';
-  let courts = currentCourts.map((c) => ({ team1: [...c.team1], team2: [...c.team2] }));
-  let swapped = false;
-
-  for (let attempt = 0; attempt < 30 && !swapped; attempt++) {
-    const ci1 = Math.floor(Math.random() * courts.length);
-    const ci2 = Math.floor(Math.random() * courts.length);
-    if (ci1 === ci2) continue;
-
-    const ids1 = [...courts[ci1].team1, ...courts[ci1].team2];
-    const ids2 = [...courts[ci2].team1, ...courts[ci2].team2];
-    const i = Math.floor(Math.random() * ids1.length);
-    const j = Math.floor(Math.random() * ids2.length);
-
-    const p1 = playerMap[ids1[i]];
-    const p2 = playerMap[ids2[j]];
-    if (!p1 || !p2 || Math.abs(p1.level - p2.level) > 1) continue;
-
-    const newIds1 = [...ids1];
-    const newIds2 = [...ids2];
-    [newIds1[i], newIds2[j]] = [newIds2[j], newIds1[i]];
-
-    if (isDoubles && newIds1.length === 4 && newIds2.length === 4) {
-      const nc1 = bestSplitForGroup(newIds1, playerMap, config, blacklistSet);
-      const nc2 = bestSplitForGroup(newIds2, playerMap, config, blacklistSet);
-      if (nc1.score < 10000 && nc2.score < 10000) {
-        courts[ci1] = nc1.court;
-        courts[ci2] = nc2.court;
-        swapped = true;
-      }
-    } else if (!isDoubles) {
-      courts[ci1] = { team1: [newIds1[0]], team2: [newIds1[1]] };
-      courts[ci2] = { team1: [newIds2[0]], team2: [newIds2[1]] };
-      swapped = true;
-    }
-  }
-
-  if (!swapped) return null;
-  return sortCourtsByStrength(courts, playerMap);
-}
-
-// ── ROTATE: shift weakest/strongest between adjacent courts ──
-function rotateCourts(currentCourts, playerMap, config, blacklistSet) {
-  if (currentCourts.length < 2) return null;
-
-  const isDoubles = config.gameFormat !== 'singles';
-  const courts = currentCourts.map((c) => ({ team1: [...c.team1], team2: [...c.team2] }));
-
-  for (let ci = 0; ci < courts.length - 1; ci++) {
-    const ids1 = [...courts[ci].team1, ...courts[ci].team2];
-    const ids2 = [...courts[ci + 1].team1, ...courts[ci + 1].team2];
-
-    ids1.sort((a, b) => (playerMap[a]?.level || 0) - (playerMap[b]?.level || 0));
-    ids2.sort((a, b) => (playerMap[b]?.level || 0) - (playerMap[a]?.level || 0));
-
-    const weakest = ids1[0];
-    const strongest = ids2[0];
-    if (weakest === strongest) continue;
-
-    const newIds1 = [...courts[ci].team1, ...courts[ci].team2].map((id) =>
-      id === weakest ? strongest : id,
-    );
-    const newIds2 = [...courts[ci + 1].team1, ...courts[ci + 1].team2].map((id) =>
-      id === strongest ? weakest : id,
-    );
-
-    if (isDoubles && newIds1.length === 4 && newIds2.length === 4) {
-      courts[ci] = bestSplitForGroup(newIds1, playerMap, config, blacklistSet).court;
-      courts[ci + 1] = bestSplitForGroup(newIds2, playerMap, config, blacklistSet).court;
-    } else if (!isDoubles && newIds1.length === 2 && newIds2.length === 2) {
-      courts[ci] = { team1: [newIds1[0]], team2: [newIds1[1]] };
-      courts[ci + 1] = { team1: [newIds2[0]], team2: [newIds2[1]] };
-    }
-  }
-
-  return sortCourtsByStrength(courts, playerMap);
-}
-
-export function generateCourts(activePlayerIds, allPlayers, config, previousRounds, currentCourts) {
+export function generateCourts(activePlayerIds, allPlayers, config, previousRounds) {
   const blacklistSet = buildBlacklistSet(allPlayers);
   const playerMap = Object.fromEntries(allPlayers.map((p) => [p.id, p]));
   const isDoubles = config.gameFormat !== 'singles';
@@ -459,26 +379,7 @@ export function generateCourts(activePlayerIds, allPlayers, config, previousRoun
     pool = pool.filter((id) => !sittingOut.includes(id));
   }
 
-  let courts = null;
-  const mode = config.reshuffleMode || 'rebuild';
-
-  if (currentCourts && currentCourts.length > 0) {
-    const currentPool = currentCourts.flatMap((c) => [...c.team1, ...c.team2]);
-    const poolSet = new Set(pool);
-    const valid = currentPool.length === pool.length && currentPool.every((id) => poolSet.has(id));
-
-    if (valid) {
-      if (mode === 'swap') {
-        courts = swapCourts(currentCourts, playerMap, config, blacklistSet);
-      } else if (mode === 'rotate') {
-        courts = rotateCourts(currentCourts, playerMap, config, blacklistSet);
-      }
-    }
-  }
-
-  if (!courts) {
-    courts = buildCourts(pool, playerMap, config, blacklistSet, previousRounds);
-  }
+  const courts = buildCourts(pool, playerMap, config, blacklistSet, previousRounds);
 
   const warning = isDoubles
     ? hasHardViolationsDoubles(courts, playerMap, config, blacklistSet)

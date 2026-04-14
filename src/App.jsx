@@ -14,7 +14,6 @@ const DEFAULT_CONFIG = {
   courtLevelTolerance: 3,
   avoidRepeats: true,
   mixedPairs: 'any',
-  reshuffleMode: 'rebuild',
 };
 
 export default function App() {

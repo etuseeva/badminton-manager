@@ -75,21 +75,12 @@ export default function GameScreen({
     });
   };
 
-  const getCurrentCourts = () => {
-    if (!session || session.rounds.length === 0) return null;
-    const last = session.rounds[session.rounds.length - 1];
-    if (last.confirmed) return null;
-    return last.courts || null;
-  };
-
   const doGenerate = () => {
-    const currentCourts = getCurrentCourts();
     const result = generateCourts(
       session.activePlayerIds,
       players,
       config,
       session.rounds,
-      currentCourts,
     );
     setSwapPlayerId(null);
     setSession((prev) => {
@@ -110,7 +101,6 @@ export default function GameScreen({
       players,
       config,
       confirmedRounds,
-      null,
     );
     setSwapPlayerId(null);
     setSession((prev) => ({

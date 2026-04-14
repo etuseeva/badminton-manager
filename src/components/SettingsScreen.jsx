@@ -86,21 +86,6 @@ export default function SettingsScreen({ config, setConfig, onClose }) {
               />
             </SettingCard>
           )}
-
-          <SettingCard
-            label="Перемешивание"
-            description="Как менять пары при перегенерации"
-          >
-            <SegmentedControl
-              options={[
-                { value: 'swap', label: 'Свапы' },
-                { value: 'rebuild', label: 'Пересборка' },
-                { value: 'rotate', label: 'Ротация' },
-              ]}
-              value={config.reshuffleMode}
-              onChange={(v) => update('reshuffleMode', v)}
-            />
-          </SettingCard>
         </div>
       </div>
     </div>

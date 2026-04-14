@@ -101,7 +101,6 @@ function migrateConfigV3() {
     courtLevelTolerance: config.courtLevelTolerance ?? 3,
     avoidRepeats: config.repeatFrequency !== 'often',
     mixedPairs: config.mixedPairs === true ? 'prefer' : (typeof config.mixedPairs === 'string' ? config.mixedPairs : 'any'),
-    reshuffleMode: 'rebuild',
   };
 
   localStorage.setItem('bp_config', JSON.stringify(migrated));
