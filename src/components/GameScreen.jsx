@@ -180,7 +180,7 @@ export default function GameScreen({
           </div>
         )}
 
-        <div className="fixed bottom-14 left-0 right-0 z-10 bg-slate-50/95 backdrop-blur-sm px-4 py-3 border-t border-gray-100">
+        <div className="fixed bottom-14 left-0 right-0 z-10 bg-slate-50/95 backdrop-blur-sm px-4 py-3 pb-6 border-t border-gray-100">
           <div className="max-w-[480px] mx-auto">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">
