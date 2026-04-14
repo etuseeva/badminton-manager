@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { generateCourts } from '../utils/pairing';
 import CourtCard from './PairCard';
-import ConfigPanel from './ConfigPanel';
+import SearchInput from './SearchInput';
 
 const levelColors = [
   '',
@@ -17,15 +17,14 @@ export default function GameScreen({
   session,
   setSession,
   config,
-  setConfig,
-  blacklist,
   history,
   setHistory,
 }) {
   const [selected, setSelected] = useState(() => new Set(players.map((p) => p.id)));
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showSessionHistory, setShowSessionHistory] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sessionSearch, setSessionSearch] = useState('');
 
   const toggle = (id) => {
     setSelected((prev) => {
@@ -77,8 +76,7 @@ export default function GameScreen({
       session.activePlayerIds,
       players,
       config,
-      session.rounds,
-      blacklist
+      session.rounds
     );
     setSession((prev) => {
       const rounds = [...prev.rounds];
@@ -92,17 +90,17 @@ export default function GameScreen({
   };
 
   const nextRound = () => {
+    const confirmedRounds = session.rounds.map((r) => ({ ...r, confirmed: true }));
     const result = generateCourts(
       session.activePlayerIds,
       players,
       config,
-      session.rounds.map((r) => ({ ...r, confirmed: true })),
-      blacklist
+      confirmedRounds
     );
     setSession((prev) => ({
       ...prev,
       rounds: [
-        ...prev.rounds.map((r) => ({ ...r, confirmed: true })),
+        ...confirmedRounds,
         { ...result, timestamp: Date.now(), confirmed: false },
       ],
     }));
@@ -119,27 +117,39 @@ export default function GameScreen({
 
   const playerName = (id) => players.find((p) => p.id === id)?.name || '?';
 
+  // ── Pre-session: player selection ──
   if (!session) {
     const sortedPlayers = [...players].sort((a, b) => a.name.localeCompare(b.name));
+    const filteredPlayers = search
+      ? sortedPlayers.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+      : sortedPlayers;
     const count = selected.size;
 
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800">Новая игра</h1>
-          <div className="flex gap-2">
-            <button onClick={selectAll} className="text-xs text-teal-primary">Все</button>
-            <button onClick={selectNone} className="text-xs text-gray-400">Никто</button>
+          <div className="flex gap-3">
+            <button onClick={selectAll} className="text-xs text-teal-primary">
+              Выбрать всех
+            </button>
+            <button onClick={selectNone} className="text-xs text-gray-400">
+              Сбросить
+            </button>
           </div>
         </div>
+
+        {players.length > 5 && (
+          <SearchInput value={search} onChange={setSearch} placeholder="Поиск по имени..." />
+        )}
 
         {sortedPlayers.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">
             Сначала добавьте игроков во вкладке Игроки
           </p>
         ) : (
-          <div className="space-y-1">
-            {sortedPlayers.map((p) => (
+          <div className="space-y-1 pb-24">
+            {filteredPlayers.map((p) => (
               <button
                 key={p.id}
                 onClick={() => toggle(p.id)}
@@ -163,65 +173,46 @@ export default function GameScreen({
                   <span className="text-xs text-gray-400">{p.gender === 'M' ? 'М' : 'Ж'}</span>
                 )}
                 <span className={`text-xs px-2 py-0.5 rounded-full ${levelColors[p.level]}`}>
-                  Ур.{p.level}
+                  Ур. {p.level}
                 </span>
               </button>
             ))}
           </div>
         )}
 
-        <div className="sticky bottom-16 bg-slate-50/90 backdrop-blur-sm py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500">
-              {count} выбрано
-              {count > 0 && count < 4 && ' (нужно минимум 4)'}
-              {count >= 4 && count % 4 !== 0 && ` (${count % 4} будут отдыхать)`}
-            </span>
-          </div>
-          <button
-            onClick={startSession}
-            disabled={count < 4}
-            className="w-full py-3 bg-teal-primary text-white rounded-xl text-sm font-semibold disabled:opacity-30"
-          >
-            Начать игру
-          </button>
-        </div>
-
-        {history.length > 0 && (
-          <div className="pt-2">
+        <div className="fixed bottom-14 left-0 right-0 z-10 bg-slate-50/95 backdrop-blur-sm px-4 py-3 border-t border-gray-100">
+          <div className="max-w-[480px] mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-500">
+                {count} выбрано
+                {count > 0 && count < 4 && config.gameFormat === 'doubles' && ' (нужно минимум 4)'}
+                {count > 0 && count < 2 && config.gameFormat === 'singles' && ' (нужно минимум 2)'}
+                {config.gameFormat === 'doubles' && count >= 4 && count % 4 !== 0 &&
+                  ` (${count % 4} будут отдыхать)`}
+                {config.gameFormat === 'singles' && count >= 2 && count % 2 !== 0 &&
+                  ' (1 будет отдыхать)'}
+              </span>
+            </div>
             <button
-              onClick={() => setShowSessionHistory(!showSessionHistory)}
-              className="text-xs text-gray-400 underline"
+              onClick={startSession}
+              disabled={config.gameFormat === 'doubles' ? count < 4 : count < 2}
+              className="w-full py-3 bg-teal-primary text-white rounded-xl text-sm font-semibold disabled:opacity-30"
             >
-              {showSessionHistory ? 'Скрыть' : 'Показать'} историю сессий ({history.length})
+              Начать игру
             </button>
-            {showSessionHistory && (
-              <div className="mt-2 space-y-2">
-                {history.map((s) => (
-                  <div key={s.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-gray-600">
-                        {new Date(s.startedAt).toLocaleDateString('ru-RU')}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {s.rounds.length} раундов
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {s.playerIds.map((id) => playerName(id)).join(', ')}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        )}
+        </div>
       </div>
     );
   }
 
+  // ── Active session: round view ──
   const currentRound = session.rounds[session.rounds.length - 1] || null;
   const availableToAdd = players.filter((p) => !session.playerIds.includes(p.id));
+  const sessionPlayers = players.filter((p) => session.playerIds.includes(p.id));
+  const filteredSessionPlayers = sessionSearch
+    ? sessionPlayers.filter((p) => p.name.toLowerCase().includes(sessionSearch.toLowerCase()))
+    : sessionPlayers;
 
   return (
     <div className="space-y-3">
@@ -233,14 +224,20 @@ export default function GameScreen({
           onClick={endSession}
           className="text-xs text-red-400 underline"
         >
-          Завершить
+          Завершить игру
         </button>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>{session.activePlayerIds.length} активных</span>
-        <ConfigPanel config={config} setConfig={setConfig} />
+      <div className="text-xs text-gray-400">
+        {session.activePlayerIds.length} активных из {session.playerIds.length}
+        {config.gameFormat === 'singles' && ' · одиночки'}
       </div>
+
+      {currentRound && currentRound.warning && (
+        <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+          Не удалось идеально подобрать пары с текущими настройками
+        </div>
+      )}
 
       {currentRound && currentRound.courts && currentRound.courts.length > 0 ? (
         <div className="space-y-2">
@@ -257,7 +254,7 @@ export default function GameScreen({
         </div>
       ) : (
         <div className="text-center py-8 text-sm text-gray-400">
-          Нажмите Составить для генерации пар
+          Нажмите «Составить пары» для генерации
         </div>
       )}
 
@@ -267,7 +264,7 @@ export default function GameScreen({
           disabled={session.activePlayerIds.length < 2}
           className="flex-1 py-2.5 bg-teal-primary text-white rounded-lg text-sm font-medium disabled:opacity-30"
         >
-          {currentRound && !currentRound.confirmed ? 'Пересоставить' : 'Составить'}
+          {currentRound && !currentRound.confirmed ? 'Перемешать' : 'Составить пары'}
         </button>
         {currentRound && (
           <button
@@ -281,30 +278,33 @@ export default function GameScreen({
       </div>
 
       <div className="space-y-1">
-        <div className="text-xs text-gray-400 mb-1">Игроки</div>
-        {players
-          .filter((p) => session.playerIds.includes(p.id))
-          .map((p) => (
-            <button
-              key={p.id}
-              onClick={() => toggleActive(p.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                session.activePlayerIds.includes(p.id)
-                  ? 'bg-white text-gray-800 border border-gray-100'
-                  : 'bg-gray-50 text-gray-400 line-through border border-transparent'
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-gray-400">Игроки</span>
+        </div>
+        {sessionPlayers.length > 6 && (
+          <SearchInput value={sessionSearch} onChange={setSessionSearch} placeholder="Поиск..." />
+        )}
+        {filteredSessionPlayers.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => toggleActive(p.id)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+              session.activePlayerIds.includes(p.id)
+                ? 'bg-white text-gray-800 border border-gray-100'
+                : 'bg-gray-50 text-gray-400 line-through border border-transparent'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                session.activePlayerIds.includes(p.id) ? 'bg-green-400' : 'bg-gray-300'
               }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  session.activePlayerIds.includes(p.id) ? 'bg-green-400' : 'bg-gray-300'
-                }`}
-              />
-              <span className="flex-1">{p.name}</span>
-              <span className="text-[10px] text-gray-400">
-                {session.activePlayerIds.includes(p.id) ? 'в игре' : 'ушёл'}
-              </span>
-            </button>
-          ))}
+            />
+            <span className="flex-1">{p.name}</span>
+            <span className="text-[10px] text-gray-400">
+              {session.activePlayerIds.includes(p.id) ? 'в игре' : 'ушёл'}
+            </span>
+          </button>
+        ))}
       </div>
 
       {availableToAdd.length > 0 && (
@@ -337,7 +337,7 @@ export default function GameScreen({
             onClick={() => setShowHistory(!showHistory)}
             className="text-xs text-gray-400 underline"
           >
-            {showHistory ? 'Скрыть' : 'Показать'} историю ({session.rounds.length - 1} раундов)
+            {showHistory ? 'Скрыть' : 'Показать'} историю раундов ({session.rounds.length - 1})
           </button>
           {showHistory && (
             <div className="mt-2 space-y-2">

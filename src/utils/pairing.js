@@ -11,7 +11,17 @@ function pairKey(id1, id2) {
   return [id1, id2].sort().join(':');
 }
 
-function splitIntoTeams(group, players) {
+function buildBlacklistSet(allPlayers) {
+  const set = new Set();
+  for (const p of allPlayers) {
+    for (const blockedId of p.blacklist || []) {
+      set.add(pairKey(p.id, blockedId));
+    }
+  }
+  return set;
+}
+
+function splitIntoTeams(group, playerMap, pairLevelTolerance) {
   const [a, b, c, d] = group;
   const splits = [
     { team1: [a, b], team2: [c, d] },
@@ -19,16 +29,29 @@ function splitIntoTeams(group, players) {
     { team1: [a, d], team2: [b, c] },
   ];
 
-  const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
-  let best = splits[0];
+  const teamPairDiff = (team) => {
+    if (team.length !== 2) return 0;
+    return Math.abs((playerMap[team[0]]?.level || 0) - (playerMap[team[1]]?.level || 0));
+  };
+
+  const valid = splits.filter((s) => {
+    return teamPairDiff(s.team1) <= pairLevelTolerance &&
+           teamPairDiff(s.team2) <= pairLevelTolerance;
+  });
+
+  const candidates = valid.length > 0 ? valid : splits;
+
+  let best = candidates[0];
   let bestDiff = Infinity;
 
-  for (const split of splits) {
+  for (const split of candidates) {
     const lvl1 = split.team1.reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
     const lvl2 = split.team2.reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
     const diff = Math.abs(lvl1 - lvl2);
-    if (diff < bestDiff) {
-      bestDiff = diff;
+    const maxPairDiff = Math.max(teamPairDiff(split.team1), teamPairDiff(split.team2));
+    const score = diff * 2 + maxPairDiff * 5;
+    if (score < bestDiff) {
+      bestDiff = score;
       best = split;
     }
   }
@@ -36,14 +59,11 @@ function splitIntoTeams(group, players) {
   return best;
 }
 
-function scoreArrangement(courts, players, config, previousRounds, blacklistSet) {
-  const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
-  const penaltyMultiplier = { low: 1, med: 3, high: 5 }[config.repeatPenalty] || 3;
+function scoreDoublesArrangement(courts, playerMap, config, previousRounds, blacklistSet) {
+  const repeatMultiplier = { often: 1, sometimes: 3, rarely: 5 }[config.repeatFrequency] || 3;
   let total = 0;
 
   for (const court of courts) {
-    const allIds = [...court.team1, ...court.team2];
-
     for (const team of [court.team1, court.team2]) {
       if (team.length === 2) {
         const [id1, id2] = team;
@@ -52,15 +72,14 @@ function scoreArrangement(courts, players, config, previousRounds, blacklistSet)
         if (!p1 || !p2) continue;
 
         const levelDiff = Math.abs(p1.level - p2.level);
-        if (levelDiff > config.levelDiffTolerance) {
-          total += (levelDiff - config.levelDiffTolerance) * 10;
+        if (levelDiff > config.pairLevelTolerance) {
+          total += 10000;
         } else {
           total += levelDiff * 2;
         }
 
-        const key = pairKey(id1, id2);
-        if (blacklistSet.has(key)) {
-          total += 1000;
+        if (blacklistSet.has(pairKey(id1, id2))) {
+          total += 10000;
         }
 
         if (config.mixedPairs && p1.gender && p2.gender && p1.gender !== p2.gender) {
@@ -71,11 +90,16 @@ function scoreArrangement(courts, players, config, previousRounds, blacklistSet)
 
     const teamLevel1 = court.team1.reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
     const teamLevel2 = court.team2.reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
-    total += Math.abs(teamLevel1 - teamLevel2) * 3;
+    const courtDiff = Math.abs(teamLevel1 - teamLevel2);
+    if (courtDiff > config.courtLevelTolerance) {
+      total += 10000;
+    } else {
+      total += courtDiff * 3;
+    }
 
+    const allIds = [...court.team1, ...court.team2];
     for (let i = 0; i < allIds.length; i++) {
       for (let j = i + 1; j < allIds.length; j++) {
-        const key = pairKey(allIds[i], allIds[j]);
         for (let r = 0; r < previousRounds.length; r++) {
           const round = previousRounds[previousRounds.length - 1 - r];
           const wasOnSameCourt = round.courts?.some((c) => {
@@ -83,10 +107,46 @@ function scoreArrangement(courts, players, config, previousRounds, blacklistSet)
             return ids.includes(allIds[i]) && ids.includes(allIds[j]);
           });
           if (wasOnSameCourt) {
-            const recency = 1 / (r + 1);
-            total += 20 * penaltyMultiplier * recency;
+            total += 20 * repeatMultiplier * (1 / (r + 1));
           }
         }
+      }
+    }
+  }
+
+  return total;
+}
+
+function scoreSinglesArrangement(courts, playerMap, config, previousRounds, blacklistSet) {
+  const repeatMultiplier = { often: 1, sometimes: 3, rarely: 5 }[config.repeatFrequency] || 3;
+  let total = 0;
+
+  for (const court of courts) {
+    const id1 = court.team1[0];
+    const id2 = court.team2[0];
+    const p1 = playerMap[id1];
+    const p2 = playerMap[id2];
+    if (!p1 || !p2) continue;
+
+    const levelDiff = Math.abs(p1.level - p2.level);
+    if (levelDiff > config.pairLevelTolerance) {
+      total += 10000;
+    } else {
+      total += levelDiff * 2;
+    }
+
+    if (blacklistSet.has(pairKey(id1, id2))) {
+      total += 10000;
+    }
+
+    for (let r = 0; r < previousRounds.length; r++) {
+      const round = previousRounds[previousRounds.length - 1 - r];
+      const played = round.courts?.some((c) => {
+        const ids = [...c.team1, ...c.team2];
+        return ids.includes(id1) && ids.includes(id2);
+      });
+      if (played) {
+        total += 20 * repeatMultiplier * (1 / (r + 1));
       }
     }
   }
@@ -108,39 +168,55 @@ function chooseSitOut(activePlayerIds, previousRounds, count) {
       }
     }
   }
-
   const sorted = [...activePlayerIds].sort((a, b) => sitOutCounts[a] - sitOutCounts[b]);
   return sorted.slice(0, count);
 }
 
-export function generateCourts(activePlayerIds, allPlayers, config, previousRounds, blacklist) {
-  const blacklistSet = new Set(blacklist.map(([a, b]) => pairKey(a, b)));
+function getNoise(randomness) {
+  const scale = { min: 2, medium: 15, max: 50 }[randomness] || 15;
+  return Math.random() * scale;
+}
+
+function sortCourtsByStrength(courts, playerMap) {
+  return [...courts].sort((a, b) => {
+    const totalA = [...a.team1, ...a.team2].reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
+    const totalB = [...b.team1, ...b.team2].reduce((s, id) => s + (playerMap[id]?.level || 0), 0);
+    return totalB - totalA;
+  });
+}
+
+export function generateCourts(activePlayerIds, allPlayers, config, previousRounds) {
+  const blacklistSet = buildBlacklistSet(allPlayers);
+  const playerMap = Object.fromEntries(allPlayers.map((p) => [p.id, p]));
+  const isDoubles = config.gameFormat !== 'singles';
+  const groupSize = isDoubles ? 4 : 2;
 
   let pool = [...activePlayerIds];
   let sittingOut = [];
 
-  if (pool.length < 4) {
-    if (pool.length < 2) return { courts: [], sittingOut: [] };
-    const shuffled = shuffle(pool);
-    const court = splitIntoTeams(
-      pool.length >= 4 ? shuffled.slice(0, 4) : shuffled,
-      allPlayers
-    );
+  if (pool.length < 2) {
+    return { courts: [], sittingOut: [], warning: false };
+  }
+
+  if (isDoubles && pool.length < 4) {
     if (pool.length === 2) {
       return {
-        courts: [{ team1: [shuffled[0]], team2: [shuffled[1]] }],
+        courts: [{ team1: [pool[0]], team2: [pool[1]] }],
         sittingOut: [],
+        warning: false,
       };
     }
     if (pool.length === 3) {
+      const shuffled = shuffle(pool);
       return {
-        courts: [{ team1: [shuffled[0]], team2: [shuffled[1], shuffled[2]] }],
+        courts: [{ team1: [shuffled[0], shuffled[1]], team2: [shuffled[2]] }],
         sittingOut: [],
+        warning: false,
       };
     }
   }
 
-  const remainder = pool.length % 4;
+  const remainder = pool.length % groupSize;
   if (remainder > 0) {
     sittingOut = chooseSitOut(pool, previousRounds, remainder);
     pool = pool.filter((id) => !sittingOut.includes(id));
@@ -152,14 +228,20 @@ export function generateCourts(activePlayerIds, allPlayers, config, previousRoun
   for (let i = 0; i < 100; i++) {
     const shuffled = shuffle(pool);
     const courts = [];
-    for (let j = 0; j < shuffled.length; j += 4) {
-      const group = shuffled.slice(j, j + 4);
-      courts.push(splitIntoTeams(group, allPlayers));
+
+    if (isDoubles) {
+      for (let j = 0; j < shuffled.length; j += 4) {
+        courts.push(splitIntoTeams(shuffled.slice(j, j + 4), playerMap, config.pairLevelTolerance));
+      }
+    } else {
+      for (let j = 0; j < shuffled.length; j += 2) {
+        courts.push({ team1: [shuffled[j]], team2: [shuffled[j + 1]] });
+      }
     }
 
-    const raw = scoreArrangement(courts, allPlayers, config, previousRounds, blacklistSet);
-    const noise = Math.random() * 10;
-    const score = raw * config.balanceWeight + noise * (1 - config.balanceWeight);
+    const scoreFn = isDoubles ? scoreDoublesArrangement : scoreSinglesArrangement;
+    const raw = scoreFn(courts, playerMap, config, previousRounds, blacklistSet);
+    const score = raw + getNoise(config.randomness);
 
     if (score < bestScore) {
       bestScore = score;
@@ -167,5 +249,11 @@ export function generateCourts(activePlayerIds, allPlayers, config, previousRoun
     }
   }
 
-  return { courts: bestCourts, sittingOut };
+  bestCourts = sortCourtsByStrength(bestCourts, playerMap);
+
+  return {
+    courts: bestCourts,
+    sittingOut,
+    warning: bestScore >= 10000,
+  };
 }
