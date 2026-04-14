@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import BottomNav from './components/BottomNav';
 import PlayersScreen from './components/PlayersScreen';
-import SessionScreen from './components/SessionScreen';
-import RoundScreen from './components/RoundScreen';
+import GameScreen from './components/GameScreen';
 
 const DEFAULT_CONFIG = {
   balanceWeight: 0.7,
@@ -18,6 +17,7 @@ export default function App() {
   const [blacklist, setBlacklist] = useLocalStorage('bp_blacklist', []);
   const [config, setConfig] = useLocalStorage('bp_config', DEFAULT_CONFIG);
   const [session, setSession] = useLocalStorage('bp_session', null);
+  const [history, setHistory] = useLocalStorage('bp_history', []);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -30,26 +30,20 @@ export default function App() {
             setBlacklist={setBlacklist}
           />
         )}
-        {tab === 'session' && (
-          <SessionScreen
-            players={players}
-            session={session}
-            setSession={setSession}
-            onNavigate={setTab}
-          />
-        )}
-        {tab === 'round' && (
-          <RoundScreen
+        {tab === 'game' && (
+          <GameScreen
             players={players}
             session={session}
             setSession={setSession}
             config={config}
             setConfig={setConfig}
             blacklist={blacklist}
+            history={history}
+            setHistory={setHistory}
           />
         )}
       </div>
-      <BottomNav active={tab} onChange={setTab} hasSession={!!session} />
+      <BottomNav active={tab} onChange={setTab} />
     </div>
   );
 }

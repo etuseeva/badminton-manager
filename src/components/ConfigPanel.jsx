@@ -13,14 +13,14 @@ export default function ConfigPanel({ config, setConfig }) {
         onClick={() => setOpen(!open)}
         className="text-xs text-gray-400 underline"
       >
-        {open ? 'Hide' : 'Show'} Settings
+        {open ? 'Скрыть' : 'Показать'} настройки
       </button>
 
       {open && (
         <div className="mt-2 bg-white rounded-xl p-3 shadow-sm border border-gray-100 space-y-3">
           <div>
             <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>Balance vs Random</span>
+              <span>Баланс / Случайность</span>
               <span>{Math.round(config.balanceWeight * 100)}%</span>
             </div>
             <input
@@ -32,15 +32,19 @@ export default function ConfigPanel({ config, setConfig }) {
               className="w-full accent-teal-primary"
             />
             <div className="flex justify-between text-[10px] text-gray-300">
-              <span>Random</span>
-              <span>Balanced</span>
+              <span>Случайно</span>
+              <span>По уровню</span>
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">Repeat penalty</span>
+            <span className="text-xs text-gray-500">Штраф за повтор</span>
             <div className="flex gap-1">
-              {['low', 'med', 'high'].map((v) => (
+              {[
+                { v: 'low', label: 'Низк' },
+                { v: 'med', label: 'Сред' },
+                { v: 'high', label: 'Выс' },
+              ].map(({ v, label }) => (
                 <button
                   key={v}
                   onClick={() => update('repeatPenalty', v)}
@@ -50,14 +54,14 @@ export default function ConfigPanel({ config, setConfig }) {
                       : 'bg-gray-100 text-gray-500'
                   }`}
                 >
-                  {v}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">Level diff tolerance</span>
+            <span className="text-xs text-gray-500">Допуск разницы уровней</span>
             <div className="flex gap-1">
               {[0, 1, 2, 3, 4].map((v) => (
                 <button
@@ -76,7 +80,7 @@ export default function ConfigPanel({ config, setConfig }) {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">Prefer mixed pairs</span>
+            <span className="text-xs text-gray-500">Смешанные пары</span>
             <button
               onClick={() => update('mixedPairs', !config.mixedPairs)}
               className={`w-12 h-6 rounded-full relative transition-colors ${

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import PlayerForm from './PlayerForm';
+import BatchAddForm from './BatchAddForm';
 
 export default function PlayersScreen({ players, setPlayers, blacklist, setBlacklist }) {
   const [showForm, setShowForm] = useState(false);
+  const [showBatch, setShowBatch] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [bl1, setBl1] = useState('');
@@ -11,6 +13,12 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
   const addPlayer = (data) => {
     setPlayers((prev) => [...prev, { ...data, id: crypto.randomUUID() }]);
     setShowForm(false);
+  };
+
+  const batchAdd = (list) => {
+    const newPlayers = list.map((p) => ({ ...p, id: crypto.randomUUID() }));
+    setPlayers((prev) => [...prev, ...newPlayers]);
+    setShowBatch(false);
   };
 
   const updatePlayer = (data) => {
@@ -52,24 +60,38 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
     'bg-red-100 text-red-700',
   ];
 
+  const noFormOpen = !showForm && !showBatch && editingId === null;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-800">Players</h1>
-        <span className="text-xs text-gray-400">{players.length} total</span>
+        <h1 className="text-lg font-bold text-gray-800">Игроки</h1>
+        <span className="text-xs text-gray-400">{players.length} всего</span>
       </div>
 
-      {!showForm && editingId === null && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-teal-primary hover:text-teal-primary transition-colors"
-        >
-          + Add Player
-        </button>
+      {noFormOpen && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex-1 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-teal-primary hover:text-teal-primary transition-colors"
+          >
+            + Добавить
+          </button>
+          <button
+            onClick={() => setShowBatch(true)}
+            className="flex-1 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-teal-primary hover:text-teal-primary transition-colors"
+          >
+            + Список
+          </button>
+        </div>
       )}
 
       {showForm && (
         <PlayerForm onSave={addPlayer} onCancel={() => setShowForm(false)} />
+      )}
+
+      {showBatch && (
+        <BatchAddForm onAdd={batchAdd} onCancel={() => setShowBatch(false)} />
       )}
 
       <div className="space-y-1.5">
@@ -92,12 +114,14 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
                   {p.name}
                 </span>
                 {p.gender && (
-                  <span className="text-xs text-gray-400">{p.gender}</span>
+                  <span className="text-xs text-gray-400">
+                    {p.gender === 'M' ? 'М' : 'Ж'}
+                  </span>
                 )}
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${levelColors[p.level]}`}
                 >
-                  Lv{p.level}
+                  Ур.{p.level}
                 </span>
                 <button
                   onClick={() => setEditingId(p.id)}
@@ -120,7 +144,7 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
         onClick={() => setShowBlacklist(!showBlacklist)}
         className="text-xs text-gray-400 underline"
       >
-        {showBlacklist ? 'Hide' : 'Show'} Do-Not-Pair List ({blacklist.length})
+        {showBlacklist ? 'Скрыть' : 'Показать'} запрет пар ({blacklist.length})
       </button>
 
       {showBlacklist && (
@@ -131,7 +155,7 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
               onChange={(e) => setBl1(e.target.value)}
               className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
             >
-              <option value="">Player 1</option>
+              <option value="">Игрок 1</option>
               {players.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -143,7 +167,7 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
               onChange={(e) => setBl2(e.target.value)}
               className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
             >
-              <option value="">Player 2</option>
+              <option value="">Игрок 2</option>
               {players.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -154,7 +178,7 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
               onClick={addBlacklistPair}
               className="px-3 py-1.5 bg-teal-primary text-white rounded-lg text-sm"
             >
-              Add
+              +
             </button>
           </div>
           {blacklist.map(([a, b], i) => (
@@ -174,7 +198,7 @@ export default function PlayersScreen({ players, setPlayers, blacklist, setBlack
             </div>
           ))}
           {blacklist.length === 0 && (
-            <p className="text-xs text-gray-400 text-center">No pairs blocked</p>
+            <p className="text-xs text-gray-400 text-center">Нет запретов</p>
           )}
         </div>
       )}

@@ -34,12 +34,12 @@ export default function PlayerForm({ player, onSave, onCancel }) {
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Player name"
+        placeholder="Имя игрока"
         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-primary"
         autoFocus
       />
       <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-500 shrink-0">Level</label>
+        <label className="text-xs text-gray-500 shrink-0">Уровень</label>
         <div className="flex gap-1 flex-1">
           {[1, 2, 3, 4, 5].map((l) => (
             <button
@@ -58,12 +58,12 @@ export default function PlayerForm({ player, onSave, onCancel }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <label className="text-xs text-gray-500 shrink-0">Gender</label>
+        <label className="text-xs text-gray-500 shrink-0">Пол</label>
         <div className="flex gap-1">
           {[
             { value: null, label: '—' },
-            { value: 'M', label: 'M' },
-            { value: 'F', label: 'F' },
+            { value: 'M', label: 'М' },
+            { value: 'F', label: 'Ж' },
           ].map((g) => (
             <button
               key={g.label}
@@ -85,7 +85,7 @@ export default function PlayerForm({ player, onSave, onCancel }) {
           type="submit"
           className="flex-1 py-2 bg-teal-primary text-white rounded-lg text-sm font-medium"
         >
-          {player ? 'Save' : 'Add Player'}
+          {player ? 'Сохранить' : 'Добавить'}
         </button>
         {onCancel && (
           <button
@@ -93,7 +93,7 @@ export default function PlayerForm({ player, onSave, onCancel }) {
             onClick={onCancel}
             className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm"
           >
-            Cancel
+            Отмена
           </button>
         )}
       </div>
