@@ -12,6 +12,7 @@ const DEFAULT_CONFIG = {
   gameFormat: 'doubles',
   pairLevelTolerance: 2,
   courtLevelTolerance: 3,
+  courtShuffle: 1,
   avoidRepeats: true,
   mixedPairs: 'any',
 };

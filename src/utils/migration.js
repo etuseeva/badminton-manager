@@ -1,4 +1,4 @@
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
 export function runMigration() {
   const version = JSON.parse(localStorage.getItem('bp_version') || '0');
@@ -12,6 +12,10 @@ export function runMigration() {
 
   if (version < 3) {
     migrateConfigV3();
+  }
+
+  if (version < 4) {
+    migrateConfigV4();
   }
 
   localStorage.setItem('bp_version', JSON.stringify(CURRENT_VERSION));
@@ -99,9 +103,21 @@ function migrateConfigV3() {
     gameFormat: config.gameFormat || 'doubles',
     pairLevelTolerance: config.pairLevelTolerance ?? 2,
     courtLevelTolerance: config.courtLevelTolerance ?? 3,
+    courtShuffle: config.courtShuffle ?? 1,
     avoidRepeats: config.repeatFrequency !== 'often',
     mixedPairs: config.mixedPairs === true ? 'prefer' : (typeof config.mixedPairs === 'string' ? config.mixedPairs : 'any'),
   };
 
   localStorage.setItem('bp_config', JSON.stringify(migrated));
+}
+
+function migrateConfigV4() {
+  const raw = localStorage.getItem('bp_config');
+  if (!raw) return;
+
+  const config = JSON.parse(raw);
+  if (config.courtShuffle !== undefined) return;
+
+  config.courtShuffle = 1;
+  localStorage.setItem('bp_config', JSON.stringify(config));
 }

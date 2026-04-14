@@ -61,6 +61,21 @@ export default function SettingsScreen({ config, setConfig, onClose }) {
           </SettingCard>
 
           <SettingCard
+            label="Перемешивание кортов"
+            description="Насколько игроки могут перемещаться между кортами"
+          >
+            <SegmentedControl
+              options={[
+                { value: 0, label: 'Строго' },
+                { value: 1, label: 'Немного' },
+                { value: 2, label: 'Сильно' },
+              ]}
+              value={config.courtShuffle}
+              onChange={(v) => update('courtShuffle', v)}
+            />
+          </SettingCard>
+
+          <SettingCard
             label="Избегать повторов"
             description="Не ставить одних и тех же игроков вместе повторно"
           >

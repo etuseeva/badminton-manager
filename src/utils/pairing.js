@@ -39,7 +39,7 @@ function chooseSitOut(activePlayerIds, previousRounds, count) {
   return sorted.slice(0, count);
 }
 
-function sortByLevelWithShuffle(playerIds, playerMap) {
+function sortByLevelWithShuffle(playerIds, playerMap, courtShuffle = 0) {
   const byLevel = {};
   for (const id of playerIds) {
     const level = playerMap[id]?.level || 0;
@@ -54,6 +54,20 @@ function sortByLevelWithShuffle(playerIds, playerMap) {
   for (const level of levels) {
     result.push(...byLevel[level]);
   }
+
+  if (courtShuffle > 0) {
+    const passes = courtShuffle;
+    const chance = courtShuffle === 1 ? 0.3 : 0.5;
+    for (let p = 0; p < passes; p++) {
+      for (let i = 0; i < result.length - 1; i++) {
+        if (Math.random() < chance) {
+          [result[i], result[i + 1]] = [result[i + 1], result[i]];
+          i++;
+        }
+      }
+    }
+  }
+
   return result;
 }
 
@@ -219,31 +233,33 @@ function tryFixDoublesRepeats(courts, playerMap, config, previousRounds, blackli
 
   for (let pass = 0; pass < 3; pass++) {
     let improved = false;
-    for (let ci = 0; ci < result.length - 1; ci++) {
-      const ids1 = [...result[ci].team1, ...result[ci].team2];
-      const ids2 = [...result[ci + 1].team1, ...result[ci + 1].team2];
+    for (let ci = 0; ci < result.length; ci++) {
+      for (let cj = ci + 1; cj < result.length; cj++) {
+        const ids1 = [...result[ci].team1, ...result[ci].team2];
+        const ids2 = [...result[cj].team1, ...result[cj].team2];
 
-      for (let i = 0; i < ids1.length; i++) {
-        for (let j = 0; j < ids2.length; j++) {
-          const tempIds1 = [...ids1];
-          const tempIds2 = [...ids2];
-          [tempIds1[i], tempIds2[j]] = [tempIds2[j], tempIds1[i]];
+        for (let i = 0; i < ids1.length; i++) {
+          for (let j = 0; j < ids2.length; j++) {
+            const tempIds1 = [...ids1];
+            const tempIds2 = [...ids2];
+            [tempIds1[i], tempIds2[j]] = [tempIds2[j], tempIds1[i]];
 
-          const nc1 = bestSplitForGroup(tempIds1, playerMap, config, blacklistSet);
-          const nc2 = bestSplitForGroup(tempIds2, playerMap, config, blacklistSet);
+            const nc1 = bestSplitForGroup(tempIds1, playerMap, config, blacklistSet);
+            const nc2 = bestSplitForGroup(tempIds2, playerMap, config, blacklistSet);
 
-          if (nc1.score >= 10000 || nc2.score >= 10000) continue;
+            if (nc1.score >= 10000 || nc2.score >= 10000) continue;
 
-          const test = [...result];
-          test[ci] = nc1.court;
-          test[ci + 1] = nc2.court;
+            const test = [...result];
+            test[ci] = nc1.court;
+            test[cj] = nc2.court;
 
-          const newRepeat = getRepeatScore(test, previousRounds);
-          if (newRepeat < bestRepeat) {
-            result[ci] = nc1.court;
-            result[ci + 1] = nc2.court;
-            bestRepeat = newRepeat;
-            improved = true;
+            const newRepeat = getRepeatScore(test, previousRounds);
+            if (newRepeat < bestRepeat) {
+              result[ci] = nc1.court;
+              result[cj] = nc2.court;
+              bestRepeat = newRepeat;
+              improved = true;
+            }
           }
         }
       }
@@ -319,7 +335,7 @@ function sortCourtsByStrength(courts, playerMap) {
 
 // ── REBUILD ──
 function buildCourts(pool, playerMap, config, blacklistSet, previousRounds) {
-  const sorted = sortByLevelWithShuffle(pool, playerMap);
+  const sorted = sortByLevelWithShuffle(pool, playerMap, config.courtShuffle || 0);
   const isDoubles = config.gameFormat !== 'singles';
   let courts = [];
 
@@ -341,6 +357,19 @@ function buildCourts(pool, playerMap, config, blacklistSet, previousRounds) {
 
   return sortCourtsByStrength(courts, playerMap);
 }
+
+function scoreDoublesTotal(courts, playerMap, config, blacklistSet, previousRounds) {
+  let total = 0;
+  for (const court of courts) {
+    total += scoreSplit(court, playerMap, config, blacklistSet).score;
+  }
+  if (config.avoidRepeats) {
+    total += getRepeatScore(courts, previousRounds);
+  }
+  return total;
+}
+
+const CANDIDATES = 8;
 
 export function generateCourts(activePlayerIds, allPlayers, config, previousRounds) {
   const blacklistSet = buildBlacklistSet(allPlayers);
@@ -379,11 +408,24 @@ export function generateCourts(activePlayerIds, allPlayers, config, previousRoun
     pool = pool.filter((id) => !sittingOut.includes(id));
   }
 
-  const courts = buildCourts(pool, playerMap, config, blacklistSet, previousRounds);
+  let bestCourts = null;
+  let bestTotal = Infinity;
+
+  for (let attempt = 0; attempt < CANDIDATES; attempt++) {
+    const courts = buildCourts(pool, playerMap, config, blacklistSet, previousRounds);
+    const total = isDoubles
+      ? scoreDoublesTotal(courts, playerMap, config, blacklistSet, previousRounds)
+      : scoreSinglesArr(courts, playerMap, config, blacklistSet, previousRounds);
+
+    if (total < bestTotal) {
+      bestTotal = total;
+      bestCourts = courts;
+    }
+  }
 
   const warning = isDoubles
-    ? hasHardViolationsDoubles(courts, playerMap, config, blacklistSet)
-    : hasHardViolationsSingles(courts, playerMap, config, blacklistSet);
+    ? hasHardViolationsDoubles(bestCourts, playerMap, config, blacklistSet)
+    : hasHardViolationsSingles(bestCourts, playerMap, config, blacklistSet);
 
-  return { courts, sittingOut, warning };
+  return { courts: bestCourts, sittingOut, warning };
 }
